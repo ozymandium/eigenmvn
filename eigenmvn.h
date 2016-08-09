@@ -36,6 +36,7 @@
 #include <Eigen/Dense>
 #include <random>
 #include <ctime>
+#include <cmath>
 
 /*
   We need a functor that can pretend it's const,
@@ -66,7 +67,7 @@ namespace Eigen {
 
       inline void seed() {
         timespec_get(&ts, TIME_UTC);
-        std::cout << (uint64_t) ts.tv_nsec << std::endl;
+        // std::cout << (uint64_t) ts.tv_nsec << std::endl;
         rng.seed((uint64_t) ts.tv_nsec);
       }
     };
@@ -151,15 +152,47 @@ namespace Eigen {
 
       /// Draw nn samples from the gaussian and return them
       /// as columns in a Dynamic by nn matrix
-      Matrix<Scalar,Dynamic,-1> rnd(int nn)
-      {
-        randN.seed();
+      Matrix<Scalar,Dynamic,-1> sample(
+        int nn
+      ) {
+        this->randN.seed();
         return (_transform * Matrix<Scalar,Dynamic,-1>::NullaryExpr(_covar.rows(),nn,randN)).colwise() + _mean;
       }
 
-      // VectorXd pdf(const Matrix)
-      
+      // Vector<Scalar, Dynamic> pdf(
+      //   const Matrix<Scalar, Dynamic, Dynamic> & X,     // particles
+      //   const Matrix<Scalar, Dynamic, 1> & mu,          // mean
+      //   const Matrix<Scalar, Dynamic, Dynamic> & Sigma  // covariance
+      // ) const {
+
+      // }
+
   }; // end class MultivariateNormal
+
+
+/*  
+  Evaluate the normal PDF specified by mean and covariance for a set of 
+  multivariate samples
+*/
+template<typename Scalar>
+void mvnpdf(
+  const Matrix<Scalar, Dynamic, Dynamic> & X,     // particles
+  const Matrix<Scalar, Dynamic, 1> & mu,          // mean
+  const Matrix<Scalar, Dynamic, Dynamic> & Sigma,  // covariance
+  Matrix<Scalar, Dynamic, 1> * p
+) {
+    // todo check size
+  Matrix<Scalar, Dynamic, Dynamic> inv_Sigma = Sigma.inverse();
+  auto diff = X - mu.rowwise().replicate(X.cols());
+  // auto det_Sigma = Sigma.determinant();
+  // Scalar two_pi_k = 
+  Scalar scale = 1.0 / std::sqrt( (Scalar) std::pow( (Scalar) 2*3.1415926535897932384626433832795029, (Scalar) X.rows()) * Sigma.determinant());
+  for (int i=0; i<X.cols(); i++) {
+    (*p)(i) = scale * std::exp( -0.5 * diff.col(i).transpose() * inv_Sigma * diff.col(i) );
+  }
+}
+
+
 
 } // end namespace Eigen
 
