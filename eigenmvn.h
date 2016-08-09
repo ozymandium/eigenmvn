@@ -30,11 +30,12 @@
  * License along with this library.
  */
 
-#ifndef __EIGENMULTIVARIATENORMAL_HPP
-#define __EIGENMULTIVARIATENORMAL_HPP
+#ifndef __MultivariateNormal_HPP
+#define __MultivariateNormal_HPP
 
 #include <Eigen/Dense>
 #include <random>
+#include <ctime>
 
 /*
   We need a functor that can pretend it's const,
@@ -44,19 +45,30 @@
   variable.
 */
 namespace Eigen {
+
   namespace internal {
 
     template<typename Scalar>
     struct scalar_normal_dist_op
     {
       static std::mt19937 rng;                        // The uniform pseudo-random algorithm
+
+      // std::chrono::time_point<std::chrono::high_resolution_clock, std::chrono::microseconds> time_val;
+      // uint64_t seed_val;
+      struct timespec ts;
+
       mutable std::normal_distribution<Scalar> norm; // gaussian combinator
       
       EIGEN_EMPTY_STRUCT_CTOR(scalar_normal_dist_op)
 
       template<typename Index>
       inline const Scalar operator() (Index, Index = 0) const { return norm(rng); }
-      inline void seed(const uint64_t &s) { rng.seed(s); }
+
+      inline void seed() {
+        timespec_get(&ts, TIME_UTC);
+        std::cout << (uint64_t) ts.tv_nsec << std::endl;
+        rng.seed((uint64_t) ts.tv_nsec);
+      }
     };
 
     template<typename Scalar>
@@ -79,7 +91,7 @@ namespace Eigen {
     and then store it for sampling from a multi-variate normal 
   */
   template<typename Scalar>
-  class EigenMultivariateNormal
+  class MultivariateNormal
   {
 
     private:
@@ -93,15 +105,13 @@ namespace Eigen {
     
     public:
 
-      EigenMultivariateNormal(
+      MultivariateNormal(
         const Matrix<Scalar,Dynamic,1>& mean,
         const Matrix<Scalar,Dynamic,Dynamic>& covar,
-        const bool use_cholesky=false,
-        const uint64_t &seed = std::mt19937::default_seed
+        const bool use_cholesky = false
       )
       : _use_cholesky(use_cholesky)
       {
-        randN.seed(seed);
         setMean(mean);
         setCovar(covar);
       }
@@ -141,11 +151,15 @@ namespace Eigen {
 
       /// Draw nn samples from the gaussian and return them
       /// as columns in a Dynamic by nn matrix
-      Matrix<Scalar,Dynamic,-1> samples(int nn)
+      Matrix<Scalar,Dynamic,-1> rnd(int nn)
       {
+        randN.seed();
         return (_transform * Matrix<Scalar,Dynamic,-1>::NullaryExpr(_covar.rows(),nn,randN)).colwise() + _mean;
       }
-  }; // end class EigenMultivariateNormal
+
+      // VectorXd pdf(const Matrix)
+      
+  }; // end class MultivariateNormal
 
 } // end namespace Eigen
 
